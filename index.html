@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Catch The Run</title>
+</head>
+
+<body>
+  <h1>Catch The Run</h1>
+  <script>
+    (() => {
+      const { ProviderName, Filter } = window.opener.subscriptionDetails;
+      return fetch(
+        '/api/handlePushSubscriptionRequest.js',
+        {
+          method: 'post',
+          body: {
+            ProviderName,
+            Filter
+          }
+        }
+      )
+        .then(res => window.stringifiedSubscription = res.data)
+        .catch(err => console.log('error:', err));
+    })();
+  </script>
+</body>
+
+</html>
