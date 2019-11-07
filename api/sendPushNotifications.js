@@ -7,7 +7,37 @@ webPush.setVapidDetails(
   'S_3sQfZvYAh7LGuKkXreV_kfcmAkdNFL0nAoI2z1P3w'
 );
 
-module.exports = async (req, res) => { // eslint-disable-line
+const checkAgainstFilter = (category, filter) => {
+  if (filter === undefined) return true;
+
+  const gameTitle = category.slice(0, category.indexOf('_'));
+
+  if (filter.Type === 'B') { // blacklist
+    for (const filterGame of filter.Games.values) {
+      if (gameTitle === filterGame) return false;
+    }
+
+    for (const filterCategory of filter.Categories.values) {
+      if (category === filterCategory) return false;
+    }
+
+    return true;
+  }
+
+  else { // whitelist
+    for (const filterGame of filter.Games.values) {
+      if (gameTitle === filterGame) return true;
+    }
+
+    for (const filterCategory of filter.Categories.values) {
+      if (category === filterCategory) return true;
+    }
+
+    return false;
+  }
+};
+
+module.exports = async (req, res) => {
   const { ProviderName, Game, Category, Message } = req.body;
 
   const dynamoClient = new DynamoDB.DocumentClient({
@@ -28,17 +58,16 @@ module.exports = async (req, res) => { // eslint-disable-line
   try {
     const allPushSubs = (await dynamoClient.query(getAllPushSubsQueryParams).promise()).Items;
 
-    const massPush = await Promise.all(
-      allPushSubs.map(async sub => {
-        await webPush
-          .sendNotification(JSON.parse(sub.slice(6)), Message)
-          .then(res => console.log('webpush res:', res))
-          .catch(err => console.log('webpush error:', err));
-      })
+    const massPushResults = await Promise.all(
+      allPushSubs.map(async sub => (
+        checkAgainstFilter(Category, sub.Filter)
+          ? await webPush.sendNotification(JSON.parse(sub.SRT.slice(6)), Message)
+          : false
+      ))
     );
 
-    res.status(200).send(massPush ? true : false)
+    res.status(200).send(massPushResults ? true : false)
   } catch (e) {
-    console.log('error sending push notifs:', e);
+    res.status(500).send('Error sending push notifications:', e);
   }
 };
