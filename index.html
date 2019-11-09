@@ -8,6 +8,9 @@
 <body>
   <h1>Catch The Run</h1>
   <script src="handlePushSubscriptionRequest.js"></script>
+  <script>
+    window.opener.postMessage({ loadComplete: true }, '*');
+  </script>
 </body>
 
 </html>
