@@ -1,0 +1,6 @@
+{
+  "name": "lambda-layer",
+  "dependencies": {
+    "pg": "^7.18.2"
+  }
+}

@@ -3,3 +3,5 @@ node_modules
 .git
 .now
 .env
+*.zip
+now.json
