@@ -5,9 +5,11 @@
   "devDependencies": {},
   "dependencies": {
     "aws-sdk": "^2.543.0",
+    "axios": "^0.19.2",
     "dotenv": "^8.2.0",
     "jsonwebtoken": "^8.5.1",
     "pg": "^7.18.2",
+    "uuid": "^7.0.3",
     "web-push": "^3.4.1"
   }
 }

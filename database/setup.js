@@ -20,7 +20,7 @@ const pool = new Pool({
                 twitch_name varchar(32) UNIQUE,
                 discord_id varchar(24) UNIQUE,
                 discord_name varchar(32),
-                client_key varchar(32) UNIQUE
+                producer_key varchar(64) UNIQUE
             )`
         );
         await pool.query( // game_

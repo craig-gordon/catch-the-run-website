@@ -4,15 +4,15 @@
 <head>
   <title>Catch The Run</title>
   <script>
-      function confirm() {
-          return window.registrationConfirmed;
-      }
+    function getResponse() {
+      return window.twitchVerificationResponse;
+    }
   </script>
 </head>
 
 <body>
   <h1>Twitch</h1>
-  <script type="module" src="registerProducer.js"></script>
+  <script src="handleTwitchVerificationRequest.js"></script>
 </body>
 
 </html>
