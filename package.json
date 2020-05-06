@@ -2,7 +2,13 @@
   "name": "catch-the-run-website",
   "version": "1.0.0",
   "description": "",
-  "devDependencies": {},
+  "scripts": {
+    "setup-db-dev": "cross-env NODE_ENV=dev node database/setup.js",
+    "setup-db-staging": "cross-env NODE_ENV=staging node database/setup.js"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.2"
+  },
   "dependencies": {
     "aws-sdk": "^2.543.0",
     "axios": "^0.19.2",
