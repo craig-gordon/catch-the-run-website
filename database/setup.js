@@ -53,6 +53,7 @@ const pool = new Pool({
                 discord_id varchar(24) UNIQUE,
                 discord_name varchar(32),
                 discord_server_channel_id varchar(24) UNIQUE,
+                discord_dm_channel_id varchar(24) UNIQUE,
                 producer_key varchar(64) UNIQUE
             )`
         );
@@ -153,12 +154,12 @@ const pool = new Pool({
         try {
             // app_user
             await pool.query(
-                `INSERT INTO app_user (is_consumer, is_producer, is_discord_server, twitch_id, twitch_name, discord_id, discord_name, producer_key)
-                VALUES (true, true, false, '14930010', 'cyghfer', '153035778883059712', 'cyghfer', '120b5f0a-84c9-41b7-9602-7eb546b80e13')`
+                `INSERT INTO app_user (is_consumer, is_producer, is_discord_server, twitch_id, twitch_name, discord_id, discord_name, discord_dm_channel_id, producer_key)
+                VALUES (true, true, false, '14930010', 'cyghfer', '153035778883059712', 'cyghfer', '639275039362908161', '120b5f0a-84c9-41b7-9602-7eb546b80e13')`
             );
             await pool.query(
-                `INSERT INTO app_user (is_consumer, is_producer, is_discord_server, twitch_id, twitch_name, discord_id, discord_name)
-                VALUES (true, false, false, '36499867', 'bjw', '122874023292960769', 'bjw')`
+                `INSERT INTO app_user (is_consumer, is_producer, is_discord_server, twitch_id, twitch_name, discord_id, discord_name, producer_key)
+                VALUES (true, false, false, '36499867', 'bjw', '122874023292960769', 'bjw', 'c3718d3b-9cf2-478f-9b80-6ff14c97e042')`
             );
             await pool.query(
                 `INSERT INTO app_user (is_consumer, is_producer, is_discord_server, twitch_id, twitch_name, discord_id, discord_name)
@@ -225,85 +226,97 @@ const pool = new Pool({
             // feed_category
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 1)`
+                VALUES (2, 1)`
             );
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 2)`
+                VALUES (2, 2)`
             );
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 3)`
+                VALUES (2, 3)`
             );
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 4)`
+                VALUES (2, 4)`
             );
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 5)`
+                VALUES (2, 5)`
             );
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 6)`
+                VALUES (2, 6)`
             );
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 7)`
+                VALUES (2, 7)`
             );
             await pool.query(
                 `INSERT INTO feed_category (producer_id, category_id)
-                VALUES (1, 8)`
+                VALUES (2, 8)`
             );
             // subscription
-            await pool.query(
+            await pool.query( // cyghfer -> bjw [Push]
                 `INSERT INTO subscription (consumer_id, producer_id, discord_mention_server_id, subscription_domain, endpoint, created_at)
-                VALUES (3, 1, NULL, 'push', '{"endpoint":"https://fcm.googleapis.com/fcm/send/fAVzomLE3-U:APA91bFAGE4dc-AtWDd0LRtnSsDv_xlI-B7ok5SHgzHMtYQqL3rLubjrrqV3TQlbq6Pyu8YK7vKtxYC0OGfTuqPsS7o3VRWQc3thr-HXpHkhy-J-t_OSsjlqJ01O_jlU52c8r8RowuQl","expirationTime":null,"keys":{"p256dh":"BH0BT3ZsdAW9JaXGEaS_yBnPogWq1ud8PhyAvrmc7nk4VhJawfjEx0Ofdm1Fr_pJmTiUsTFb2Sl8Ye_xXZ2JfEE","auth":"7161HLruzmQA6My0Ff3lRw"}}', NOW())`
+                VALUES (1, 2, NULL, 'push', '{"endpoint":"https://fcm.googleapis.com/fcm/send/fAVzomLE3-U:APA91bFAGE4dc-AtWDd0LRtnSsDv_xlI-B7ok5SHgzHMtYQqL3rLubjrrqV3TQlbq6Pyu8YK7vKtxYC0OGfTuqPsS7o3VRWQc3thr-HXpHkhy-J-t_OSsjlqJ01O_jlU52c8r8RowuQl","expirationTime":null,"keys":{"p256dh":"BH0BT3ZsdAW9JaXGEaS_yBnPogWq1ud8PhyAvrmc7nk4VhJawfjEx0Ofdm1Fr_pJmTiUsTFb2Sl8Ye_xXZ2JfEE","auth":"7161HLruzmQA6My0Ff3lRw"}}', NOW())`
             );
-            await pool.query(
-                `INSERT INTO subscription (consumer_id, producer_id, discord_mention_server_id, subscription_domain, discord_subscription_type, endpoint, created_at)
-                VALUES (4, 1, null, 'discord', 'server', null, NOW())`
-            );
-            await pool.query(
+            await pool.query( // Catch The Run testing -> bjw [Server]
                 `INSERT INTO subscription (consumer_id, producer_id, discord_mention_server_id, subscription_domain, discord_subscription_type, endpoint, created_at)
                 VALUES (4, 2, null, 'discord', 'server', null, NOW())`
             );
-            await pool.query(
+            await pool.query( // cyghfer -> bjw [DM]
                 `INSERT INTO subscription (consumer_id, producer_id, discord_mention_server_id, subscription_domain, discord_subscription_type, endpoint, created_at)
-                VALUES (3, 2, 4, 'discord', '@', null, NOW())`
+                VALUES (1, 2, null, 'discord', 'dm', null, NOW())`
+            );
+            await pool.query( // cyghfer -> bjw [@ Catch The Run testing]
+                `INSERT INTO subscription (consumer_id, producer_id, discord_mention_server_id, subscription_domain, discord_subscription_type, endpoint, created_at)
+                VALUES (1, 2, 4, 'discord', '@', null, NOW())`
             );
             // allowlist_item
-            await pool.query(
+            await pool.query( // cyghfer -> bjw [Push] SMW Any%
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (1, false, 1, 1, NOW())`
             );
-            await pool.query(
+            await pool.query( // cyghfer -> bjw [Push] SMW Any% NCNSW
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (1, false, 1, 2, NOW())`
             );
-            await pool.query(
+            await pool.query( // cyghfer -> bjw [Push] SM64
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (1, false, 2, null, NOW())`
             );
-            await pool.query(
+            await pool.query( // cyghfer -> bjw [Push] SM64 16 Star
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (2, false, 2, 5, NOW())`
             );
-            await pool.query(
+            await pool.query( // Catch The Run testing -> bjw [Server] SM64 70 Star
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (2, false, 2, 6, NOW())`
             );
-            await pool.query(
+            await pool.query( // Catch The Run testing -> bjw [Server] SM64 120 Star
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (2, false, 2, 7, NOW())`
             );
-            await pool.query(
+            await pool.query( // Catch The Run testing -> bjw [Server] SM Any% No Major Glitches
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (2, false, 3, 8, NOW())`
             );
-            await pool.query(
+            await pool.query( // cyghfer -> bjw [DM] ALL
                 `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
                 VALUES (3, true, null, null, NOW())`
+            );
+            await pool.query( // cyghfer -> bjw [@ Catch The Run testing] SMW
+                `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
+                VALUES (4, false, 1, null, NOW())`
+            );
+            await pool.query( // cyghfer -> bjw [@ Catch The Run testing] SM64
+                `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
+                VALUES (4, false, 2, null, NOW())`
+            );
+            await pool.query( // cyghfer -> bjw [@ Catch The Run testing] SM
+                `INSERT INTO allowlist_item (subscription_id, allow_all, game_id, category_id, created_at)
+                VALUES (4, false, 3, null, NOW())`
             );
         } catch (e) {
             console.log(e);

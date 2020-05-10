@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import webPush from 'web-push';
 import axios from 'axios';
+import ApiExecutionContext from '../apiExecutionContext.js';
 
 webPush.setVapidDetails(
     'https://catchthe.run/',
@@ -9,7 +10,7 @@ webPush.setVapidDetails(
 );
 
 module.exports = async (req, res) => {
-    console.log('req.body:', req.body);
+    const ctx = new ApiExecutionContext(req, res, Date.now(), '/api/event');
     const {
         EventType,
         EventSource,
@@ -22,6 +23,8 @@ module.exports = async (req, res) => {
         Timestamp
     } = req.body;
 
+    if (req.headers['x-producer-key'] === undefined) return ctx.endApiExecution(null, 401, 'No Producer Key provided');
+
     const pool = new Pool({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
@@ -30,24 +33,63 @@ module.exports = async (req, res) => {
         port: process.env.DB_PORT,
     });
 
+    let producerRecord;
     try {
-        const subs = (await pool.query(
+        const producerRes = (await pool.query(
             `SELECT
-                sub.id,
+                producer.id,
+                producer.producer_key
+            FROM app_user AS producer
+            WHERE producer.twitch_name = $1`,
+            [Producer]
+        ));
+
+        if (producerRes.rowCount === 0) return ctx.endApiExecution(null, 400, 'Specified Producer is not registered with Catch The Run');
+        if (producerRes.rowCount > 1) return ctx.endApiExecution('Multiple Producer records mapped to the same Twitch Username', 500, null);
+        if (producerRes.rows[0].producer_key !== req.headers['x-producer-key']) return ctx.endApiExecution(null, 401, 'Incorrect Producer Key provided');
+
+        producerRecord = producerRes.rows[0]; 
+    } catch (err) {
+        return ctx.endApiExecution(`Error getting Producer record: ${err}`, 500, null);
+    }
+
+    const gameCategoryRes = pool.query(
+        `SELECT
+            game.id AS game_id,
+            category.id AS category_id
+        FROM game
+            INNER JOIN category ON game.id = category.game_id
+        WHERE game.title = $1
+            AND category.name = $2`,
+        [Game, Category]
+    );
+
+    let subs;
+    try {
+        subs = (await pool.query(
+            `SELECT
+                consumer.twitch_name AS consumer_twitch_name,
+                sub.id AS sub_id,
                 sub.subscription_domain AS domain,
                 sub.discord_subscription_type AS type,
                 COALESCE (
                     sub.endpoint,
-                    consumer.discord_server_channel_id,
-                    mention_server.discord_server_channel_id
+                    consumer.discord_id
                 ) AS endpoint,
-                al_item.allow_all
+                COALESCE (
+                    mention_server.discord_server_channel_id,
+                    consumer.discord_server_channel_id,
+                    consumer.discord_dm_channel_id
+                ) AS discord_channel_id,
+                al_item.allow_all AS al_allow_all,
+                game.title AS al_game_title,
+                category.name AS al_category_name
             FROM
                 subscription AS sub
                 JOIN app_user AS producer ON sub.producer_id = producer.id
                 JOIN app_user AS consumer ON sub.consumer_id = consumer.id
                 LEFT JOIN app_user AS mention_server ON sub.discord_mention_server_id = mention_server.id
-                JOIN allowlist_item AS al_item ON al_item.subscription_id = sub.id
+                LEFT JOIN allowlist_item AS al_item ON al_item.subscription_id = sub.id
                 LEFT JOIN game ON al_item.game_id = game.id
                 LEFT JOIN category ON al_item.category_id = category.id
             WHERE
@@ -61,43 +103,66 @@ module.exports = async (req, res) => {
                 )`,
             [Producer, Game, Category]
         )).rows;
+    } catch (err) {
+        return ctx.endApiExecution(`Error getting Subscription records: ${err}`, 500, null);
+    }
 
-        console.log('subs:', subs);
+    console.log('subs:', subs);
 
-        const processedSubs = {};
-        const discordServers = {};
+    const subDeduplicationTracker = {};
+    const groupedSubs = {};
 
-        const massPushResults = await Promise.all(
-            subs.map(sub => {
-                console.log('sub:', sub);
-                if (!processedSubs[sub.id]) {
-                    processedSubs[sub.id] = true;
-                    if (sub.domain === 'push') return webPush.sendNotification(JSON.parse(sub.endpoint), Message);
-                    else if (sub.domain === 'discord') return sendDiscordNotification(sub.endpoint, Message);
-                }
-            })
-        );
+    subs.forEach(sub => {
+        if (subDeduplicationTracker[sub.sub_id]) return ctx.logger.warn(`Duplicate subscription/allowlist item found: ${sub}`);
+        else subDeduplicationTracker[sub.sub_id] = true;
 
-        console.log('results:', massPushResults);
+        if (sub.domain === 'discord') {
+            if (sub.type === 'dm') {
+                groupedSubs[sub.discord_channel_id] = { domain: 'discord', message: Message };
+            } else if (sub.type === 'server') {
+                if (groupedSubs[sub.discord_channel_id]) groupedSubs[sub.discord_channel_id].message = `${Message}${groupedSubs[sub.discord_channel_id].message}`;
+                else groupedSubs[sub.discord_channel_id] = { domain: 'discord', message: Message };
+            } else if (sub.type === '@') {
+                if (groupedSubs[sub.discord_channel_id]) groupedSubs[sub.discord_channel_id].message = `${groupedSubs[sub.discord_channel_id].message} <@${sub.endpoint}>`;
+                else groupedSubs[sub.discord_channel_id] = { domain: 'discord', message: ` <@${sub.endpoint}>` };
+            }
+        } else if (sub.domain === 'push') {
+            groupedSubs[sub.endpoint] = { domain: 'push', message: Message };
+        }
+    });
 
+    const notificationsResults = await Promise.all(
+        Object.entries(groupedSubs).map(([uri, sub]) => {
+            if (sub.domain === 'push') return webPush.sendNotification(JSON.parse(uri), sub.message);
+            else if (sub.domain === 'discord') return sendDiscordNotification(uri, sub.message);
+        })
+    );
+
+    let gameCategoryRecord;
+    try {
+        gameCategoryRecord = (await gameCategoryRes).rows[0];
+    } catch (err) {
+        return ctx.endApiExecution(`Error getting Game/Category record: ${err}`, 500, null);
+    }
+
+    try {
         await pool.query(
             `INSERT INTO event (producer_id, game_id, category_id, split_name, pace, message, created_at)
-            values ($1, ${game.id}, ${category.id}, $2, $3, $4, $5)`,
-            [allowlistItemsBySub[0].id, SplitName, Pace, Message, Timestamp]
+            values ($1, $2, $3, $4, $5, $6, $7)`,
+            [producerRecord.id, gameCategoryRecord.game_id, gameCategoryRecord.category_id, SplitName, Pace, Message, Timestamp]
         );
-
-        res.status(200);
-    } catch (e) {
-        res.status(500).send('Error sending notifications to subscribers:', e);
+    } catch (err) {
+        return ctx.endApiExecution(`Error inserting new Event: ${err}`, 500, null);
     }
+
+    ctx.successfulMessagesCount = notificationsResults.filter(res => res.statusCode === 201 || res.status === 200).length;
+    return ctx.endApiExecution(null, 200, null);
 };
 
-const sendDiscordNotification = (endpoint, message) => {
+const sendDiscordNotification = (channelId, message) => {
     return axios.post(
-        `https://discordapp.com/api/channels/${endpoint}/messages`,
-        {
-            content: message
-        },
+        `https://discordapp.com/api/channels/${channelId}/messages`,
+        { content: message },
         {
             headers: {
                 'Content-Type': 'application/json',
