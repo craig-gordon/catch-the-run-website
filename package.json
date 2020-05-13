@@ -3,11 +3,16 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
+    "d": "dotenv -e env/.env.dev -- now dev",
     "setup-db-dev": "cross-env NODE_ENV=dev node database/setup.js",
-    "setup-db-staging": "cross-env NODE_ENV=staging node database/setup.js"
+    "setup-db-staging": "cross-env NODE_ENV=staging node database/setup.js",
+    "now-dev": "dotenv -e env/.env.dev -- now --prod --local-config ./now_configs/now.dev.json",
+    "now-staging": "dotenv -e env/.env.staging -- now --prod --local-config ./now_configs/now.staging.json",
+    "now-prod": "dotenv -e env/.env.prod -- now --prod --local-config ./now_configs/now.prod.json"
   },
   "devDependencies": {
-    "cross-env": "^7.0.2"
+    "cross-env": "^7.0.2",
+    "dotenv-cli": "^3.1.0"
   },
   "dependencies": {
     "aws-sdk": "^2.543.0",
