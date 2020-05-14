@@ -53,6 +53,8 @@ module.exports = async (req, res) => {
         return ctx.endApiExecution(`Error getting Producer record: ${err}`, 500, null);
     }
 
+    if (!Message.trim()) Message = `${Producer} is on the run in ${Game} - ${Category}! https://twitch.tv/${Producer}`;
+
     const gameCategoryRes = pool.query(
         `SELECT
             game.id AS game_id,
@@ -107,8 +109,6 @@ module.exports = async (req, res) => {
         return ctx.endApiExecution(`Error getting Subscription records: ${err}`, 500, null);
     }
 
-    console.log('subs:', subs);
-
     const subDeduplicationTracker = {};
     const groupedSubs = {};
 
@@ -131,10 +131,21 @@ module.exports = async (req, res) => {
         }
     });
 
-    const notificationsResults = await Promise.all( // await later
+    const notificationResults = Promise.all(
         Object.entries(groupedSubs).map(([uri, sub]) => {
-            if (sub.domain === 'push') return webPush.sendNotification(JSON.parse(uri), sub.message);
-            else if (sub.domain === 'discord') return sendDiscordNotification(uri, sub.message);
+            if (sub.domain === 'push') {
+                return webPush.sendNotification(JSON.parse(uri), sub.message)
+                    .catch(err => {
+                        ctx.logger.error(`Failed notification dispatch for sub ${JSON.stringify(sub)}: ${err}`);
+                        return err;
+                    });
+            } else if (sub.domain === 'discord') {
+                return sendDiscordNotification(uri, sub.message)
+                    .catch(err => {
+                        ctx.logger.error(`Failed notification dispatch for sub ${JSON.stringify(sub)}: ${err}`);
+                        return err;
+                    });
+            }
         })
     );
 
@@ -142,8 +153,10 @@ module.exports = async (req, res) => {
     try {
         gameCategoryRecord = (await gameCategoryRes).rows[0];
     } catch (err) {
-        return ctx.endApiExecution(`Error getting Game/Category record: ${err}`, 500, null); // do not end execution
+        return ctx.logger.error(`Error getting Game/Category record: ${err}`);
     }
+
+    await notificationResults;
 
     try {
         await pool.query(
@@ -152,10 +165,10 @@ module.exports = async (req, res) => {
             [producerRecord.id, gameCategoryRecord.game_id, gameCategoryRecord.category_id, SplitName, Pace, Message, Timestamp]
         );
     } catch (err) {
-        return ctx.endApiExecution(`Error inserting new Event: ${err}`, 500, null); // do not end execution
+        return ctx.logger.error(`Error inserting new Event: ${err}`);
     }
 
-    ctx.successfulMessagesCount = notificationsResults.filter(res => res.statusCode === 201 || res.status === 200).length; // earlier
+    ctx.successfulMessagesCount = notificationResults.filter(res => res.statusCode === 201 || res.status === 200).length;
     return ctx.endApiExecution(null, 200, null);
 };
 

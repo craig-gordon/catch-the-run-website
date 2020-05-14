@@ -28,13 +28,13 @@ const logger = new createLogger({
 });
 
 if (NODE_ENV === 'staging' || NODE_ENV === 'prod') {
-  logger.add(
-    new (transports.DailyRotateFile)({
-      dirname: './logs',
-      filename: 'ctr-discord-bot-%DATE%.log',
-      maxFiles: '365d'
-    })
-  );
+  // logger.add(
+  //   new (transports.DailyRotateFile)({
+  //     dirname: './logs',
+  //     filename: 'ctr-website-api-%DATE%.log',
+  //     maxFiles: '365d'
+  //   })
+  // );
 
   logger.add(
     new WinstonCloudWatch({
@@ -46,7 +46,7 @@ if (NODE_ENV === 'staging' || NODE_ENV === 'prod') {
       logGroupName: process.env.CLOUDWATCH_LOG_GROUP_NAME,
       logStreamName: () => {
         let date = new Date().toISOString().split('T')[0];
-        return 'ctr-discord-bot-' + date + '-' +
+        return 'ctr-website-api-' + date + '-' +
           crypto.createHash('md5')
             .update(startTime)
             .digest('hex');
